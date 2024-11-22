@@ -101,9 +101,9 @@ REPO_NAME = "mesfind/article-feed"
 TIMEZONE = pytz.timezone('UTC')
 
 # WhatsApp numbers
-WHATSAPP_NUMBER_ML = "+1234567890"  # Replace with the recipient's number for ML updates
-WHATSAPP_NUMBER_DFT = "+1234567891"  # Replace with the recipient's number for DFT updates
-WHATSAPP_NUMBER_BATTERY = "+1234567892"  # Replace with the recipient's number for Battery updates
+WHATSAPP_NUMBER_ML = "+251912086156"  # Replace with the recipient's number for ML updates
+WHATSAPP_NUMBER_DFT = "+251912086156"  # Replace with the recipient's number for DFT updates
+WHATSAPP_NUMBER_BATTERY = "+251912086156"  # Replace with the recipient's number for Battery updates
 
 # Utility functions
 def check_keywords(text, keywords):
