@@ -89,14 +89,14 @@ BATTERY_KEYWORDS = [
     "separator",
 ]
 
-# WeChat Webhook URLs
-WECHAT_WEBHOOK_ML = os.getenv('WECHAT_WEBHOOK_ML')
-WECHAT_WEBHOOK_DFT = os.getenv('WECHAT_WEBHOOK_DFT')
-WECHAT_WEBHOOK_BATTERY = os.getenv('WECHAT_WEBHOOK_BATTERY')
+# WhatsApp Webhook URLs
+WHATSAPP_WEBHOOK_ML = os.getenv('WHATSAPP_WEBHOOK_ML')
+WHATSAPP_WEBHOOK_DFT = os.getenv('WHATSAPP_WEBHOOK_DFT')
+WHATSAPP_WEBHOOK_BATTERY = os.getenv('WHATSAPP_WEBHOOK_BATTERY')
 
 # GitHub configuration
 GITHUB_TOKEN = os.getenv('MY_GITHUB_TOKEN')
-REPO_NAME = "mesfind/Paper-updates"
+REPO_NAME = "mesfind/article-feed"
 TIMEZONE = pytz.timezone('UTC')
 
 def check_keywords(text, keywords):
@@ -128,8 +128,8 @@ def format_content(entry):
         content += f"{entry.summary}\n\n"
     return content
 
-def send_to_wechat(content, webhook_url):
-    """Send message to WeChat."""
+def send_to_whatsapp(content, webhook_url):
+    """Send message to WhatsApp."""
     headers = {'Content-Type': 'application/json'}
     max_length = 1500
     parts = [content[i:i+max_length] for i in range(0, len(content), max_length)]
@@ -142,7 +142,7 @@ def send_to_wechat(content, webhook_url):
         }
         response = requests.post(webhook_url, headers=headers, json=data)
         if response.status_code != 200:
-            print(f"Failed to send message part {i+1} to WeChat: {response.text}")
+            print(f"Failed to send message part {i+1} to WhatsApp: {response.text}")
         time.sleep(1)
 
 def main():
@@ -197,56 +197,22 @@ def main():
             all_content = "\n---\n".join(content_list)
             
             # GitHub Save Logic
-            folder_path = f"{category}/{year_month}"
-            file_path = f"{folder_path}/{today}.md"
+            folder = f"articles/{category}/{year_month}"
+            filename = f"{folder}/{today}.md"
+            
             try:
-                try:
-                    repo.get_contents(folder_path)
-                except:
-                    try:
-                        repo.get_contents(f"{category}")
-                    except:
-                        repo.create_file(
-                            f"{category}/.gitkeep",
-                            f"Create folder for {category}",
-                            ""
-                        )
-                    repo.create_file(
-                        f"{folder_path}/.gitkeep",
-                        f"Create folder for {category}/{year_month}",
-                        ""
-                    )
-                
-                try:
-                    file = repo.get_contents(file_path)
-                    repo.update_file(
-                        file_path,
-                        f"Update {category} content for {today}",
-                        all_content,
-                        file.sha
-                    )
-                except:
-                    repo.create_file(
-                        file_path,
-                        f"Add {category} content for {today}",
-                        all_content
-                    )
-                    
-                print(f"Successfully updated {category} content for {today}")
-                
-                # Send to WeChat
-                if category == "ML":
-                    send_to_wechat(all_content, WECHAT_WEBHOOK_ML)
-                elif category == "DFT":
-                    send_to_wechat(all_content, WECHAT_WEBHOOK_DFT)
-                elif category == "Battery":
-                    send_to_wechat(all_content, WECHAT_WEBHOOK_BATTERY)
-                
-            except Exception as e:
-                print(f"Error occurred while saving {category} content: {str(e)}")
-    
-    if not ml_content and not dft_content and not battery_content:
-        print("No relevant content found today")
+                file_content = repo.get_contents(filename)
+                repo.update_file(filename, f"Update {filename}", all_content, file_content.sha)
+            except Exception:
+                repo.create_file(filename, f"Create {filename}", all_content)
+            
+            # Send to WhatsApp
+            if category == "ML":
+                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_ML)
+            elif category == "DFT":
+                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_DFT)
+            elif category == "Battery":
+                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_BATTERY)
 
 if __name__ == "__main__":
     main()
