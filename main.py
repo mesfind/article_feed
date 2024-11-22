@@ -63,6 +63,7 @@ import pytz
 import translators.server as tss
 import time
 import requests
+import pywhatkit as kit
 
 # Keywords
 ML_KEYWORDS = [
@@ -99,6 +100,12 @@ GITHUB_TOKEN = os.getenv('MY_GITHUB_TOKEN')
 REPO_NAME = "mesfind/article-feed"
 TIMEZONE = pytz.timezone('UTC')
 
+# WhatsApp numbers
+WHATSAPP_NUMBER_ML = "+1234567890"  # Replace with the recipient's number for ML updates
+WHATSAPP_NUMBER_DFT = "+1234567891"  # Replace with the recipient's number for DFT updates
+WHATSAPP_NUMBER_BATTERY = "+1234567892"  # Replace with the recipient's number for Battery updates
+
+# Utility functions
 def check_keywords(text, keywords):
     """Check if the text contains any keyword from the given list."""
     if not text:
@@ -120,37 +127,39 @@ def get_category(title, description):
 
 def format_content(entry):
     """Format article content."""
-    date = datetime.now(TIMEZONE).strftime("%Y-%m-%d")
     title = entry.title
+    link = entry.link
     content = f"# {title}\n\n"
-    content += f"Link: {entry.link}\n\n"
+    content += f"Link: {link}\n\n"
     if hasattr(entry, 'summary'):
         content += f"{entry.summary}\n\n"
     return content
 
-def send_to_whatsapp(content, webhook_url):
-    """Send message to WhatsApp."""
-    headers = {'Content-Type': 'application/json'}
+def send_to_whatsapp(content, recipient_number):
+    """
+    Send message via WhatsApp using pywhatkit.
+    Args:
+    - content: The message to send.
+    - recipient_number: WhatsApp phone number in international format (e.g., '+1234567890').
+    """
     max_length = 1500
-    parts = [content[i:i+max_length] for i in range(0, len(content), max_length)]
-    for i, part in enumerate(parts):
-        data = {
-            "msgtype": "text",
-            "text": {
-                "content": f"(Part {i+1}/{len(parts)})\n\n{part}"
-            }
-        }
-        response = requests.post(webhook_url, headers=headers, json=data)
-        if response.status_code != 200:
-            print(f"Failed to send message part {i+1} to WhatsApp: {response.text}")
-        time.sleep(1)
-
-def main():
-    g = Github(GITHUB_TOKEN)
-    repo = g.get_repo(REPO_NAME)
+    parts = [content[i:i + max_length] for i in range(0, len(content), max_length)]
     
-    now = datetime.now(TIMEZONE)
-    year_month = now.strftime("%Y-%m")
+    for i, part in enumerate(parts):
+        try:
+            time.sleep(20)  # Ensure a safe interval between messages
+            kit.sendwhatmsg_instantly(
+                phone_no=recipient_number,
+                message=f"(Part {i+1}/{len(parts)})\n\n{part}",
+                tab_close=True
+            )
+            print(f"Message part {i+1} sent successfully.")
+        except Exception as e:
+            print(f"Failed to send message part {i+1}: {e}")
+
+# Main script
+def main():
+    now = datetime.now(pytz.timezone('UTC'))
     today = now.strftime("%Y-%m-%d")
     
     # Content lists
@@ -164,55 +173,32 @@ def main():
             print(f"Processing feed: {feed_url}")
             
             for entry in feed.entries:
-                if 'published_parsed' in entry:
-                    entry_date = datetime(*entry.published_parsed[:6]).date()
-                elif 'updated_parsed' in entry:
-                    entry_date = datetime(*entry.updated_parsed[:6]).date()
-                else:
-                    entry_date = now.date()
-                
-                if entry_date == now.date():
-                    title = entry.get('title', '')
-                    description = entry.get('description', '')
-                    category = get_category(title, description)
-                    if category:
-                        formatted_content = format_content(entry)
-                        if category == "ML":
-                            ml_content.append(formatted_content)
-                        elif category == "DFT":
-                            dft_content.append(formatted_content)
-                        elif category == "Battery":
-                            battery_content.append(formatted_content)
-                        print(f"Found {category} content: {title}")
+                title = entry.get('title', '')
+                description = entry.get('description', '')
+                category = get_category(title, description)
+                if category:
+                    formatted_content = format_content(entry)
+                    if category == "ML":
+                        ml_content.append(formatted_content)
+                    elif category == "DFT":
+                        dft_content.append(formatted_content)
+                    elif category == "Battery":
+                        battery_content.append(formatted_content)
+                    print(f"Found {category} content: {title}")
                 
         except Exception as e:
             print(f"Error processing feed {feed_url}: {str(e)}")
     
-    for category, content_list in [
-        ("ML", ml_content), 
-        ("DFT", dft_content), 
-        ("Battery", battery_content)
-    ]:
-        if content_list:
-            all_content = "\n---\n".join(content_list)
-            
-            # GitHub Save Logic
-            folder = f"articles/{category}/{year_month}"
-            filename = f"{folder}/{today}.md"
-            
-            try:
-                file_content = repo.get_contents(filename)
-                repo.update_file(filename, f"Update {filename}", all_content, file_content.sha)
-            except Exception:
-                repo.create_file(filename, f"Create {filename}", all_content)
-            
-            # Send to WhatsApp
-            if category == "ML":
-                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_ML)
-            elif category == "DFT":
-                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_DFT)
-            elif category == "Battery":
-                send_to_whatsapp(all_content, WHATSAPP_WEBHOOK_BATTERY)
+    # Send categorized articles to WhatsApp
+    if ml_content:
+        send_to_whatsapp("\n---\n".join(ml_content), WHATSAPP_NUMBER_ML)
+    if dft_content:
+        send_to_whatsapp("\n---\n".join(dft_content), WHATSAPP_NUMBER_DFT)
+    if battery_content:
+        send_to_whatsapp("\n---\n".join(battery_content), WHATSAPP_NUMBER_BATTERY)
+
+    if not ml_content and not dft_content and not battery_content:
+        print("No relevant content found today")
 
 if __name__ == "__main__":
     main()
